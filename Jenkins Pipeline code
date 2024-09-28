@@ -1,0 +1,49 @@
+pipeline {
+    agent any
+    tools {
+        maven 'Maven3'
+    }
+    environment {
+        registry = "public.ecr.aws/w8b1y4y3/project-ecr"
+    }
+    stages {
+        stage('Git checkout') {
+            steps {
+                checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: "https://github.com/arunprakash0106/springboot-app.git"]])
+            }
+        }
+        stage ('Build') {
+        steps {
+            sh 'mvn clean install'           
+        }
+        }
+        stage ('Docker Build') {
+        steps {
+            script 
+            {
+               docker.build registry
+            }
+            }
+        }
+        stage ('Push docker image to ECR') {
+        steps {
+            script 
+            {
+               
+               sh "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w8b1y4y3"
+               sh "docker push public.ecr.aws/w8b1y4y3/project-ecr:latest"
+            }
+            }
+        }
+        stage ('K8s deploy') {
+        steps {
+               withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
+               sh "kubectl apply -f eks-deploy-k8s.yaml"
+}
+            }
+        }
+
+
+
+    }
+}
